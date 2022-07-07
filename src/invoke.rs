@@ -59,13 +59,14 @@ impl SnapshotSource for Snap {
 
 pub fn read_db(input_file: &std::path::PathBuf) -> Result<OrdMap<LedgerKey, LedgerEntry>, Error> {
     let mut res = OrdMap::new();
+    //TODO:Return Ok on NotFound
     let file = File::open(input_file)?;
 
     let mut lines = io::BufReader::new(file).lines();
     while let (Some(line1), Some(line2)) = (lines.next(), lines.next()) {
-        let lk = LedgerKey::read_xdr(&mut line1?.as_bytes())?;
-        let le = LedgerEntry::read_xdr(&mut line2?.as_bytes())?;
-        res.insert(lk, le);
+        let deserialized_lk: LedgerKey = serde_json::from_str(&line1?.as_str()).unwrap();
+        let deserialized_le: LedgerEntry = serde_json::from_str(&line2?.as_str()).unwrap();
+        res.insert(deserialized_lk, deserialized_le);
     }
 
     Ok(res)
@@ -89,9 +90,12 @@ pub fn commit_storage(
     }
 
     for (lk, le) in new_state {
-        lk.write_xdr(&mut file)?;
+        let serialized_lk = serde_json::to_string(&lk).unwrap();
+        file.write(serialized_lk.as_bytes())?;
         writeln!(&mut file)?;
-        le.write_xdr(&mut file)?;
+
+        let serialized_le = serde_json::to_string(&le).unwrap();
+        file.write(serialized_le.as_bytes())?;
         writeln!(&mut file)?;
     }
 
